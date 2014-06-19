@@ -7,6 +7,14 @@
  *  Date: 2014-02-19
  */
 metadata {
+	// Automatically generated. Make future change here.
+	definition (name: "Monoprice Motion Sensor", author: "Adam Heinmiller") 
+    {
+		capability "Motion Sensor"
+		capability "Battery"
+		capability "Temperature Measurement"
+	}
+
     simulator {
         status "inactive": "command: 2001, payload: 00"
         status "active": "command: 2001, payload: FF"
@@ -23,10 +31,10 @@ metadata {
             state("inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff")
         }
         
-        // XXX: Add a setting for the desired temperature unit (C or F).
-        //      How to change the valueTile's background color scale based
-        //      on the set unit?
-        
+		valueTile("battery", "device.battery", inactiveLabel: false, decoration: "flat") {
+            state "battery", label:'${currentValue}% battery', unit:""
+		}
+                
         valueTile("temperature", "device.temperature", inactiveLabel: false) {
             state "temperature", label:'${currentValue}°', unit:"F",
             backgroundColors:[
@@ -41,7 +49,7 @@ metadata {
         }
 
         main(["motion", "temperature"])
-        details(["motion", "temperature"])
+        details(["motion", "temperature", "battery"])
     }
 }
 
@@ -65,11 +73,45 @@ def filterSensorValue(value) {
     return (state.history.sum() / state.history.size()) as Integer
 }
 
+def shouldRequestBattery() {
+    if (!state.lastBatteryRequested) {
+        return true
+    }
+    return (getTimestamp() - state.lastBatteryRequested) > 24*60*60*1000
+}
+
+def markLastBatteryRequested() {
+    state.lastBatteryRequested = getTimestamp()
+}
+
+def getTimestamp() {
+    new Date().time
+}
+
+def updated() {
+	
+    log.debug "Updated"
+	state.lastBatteryRequested = null
+}
+
+
+
 def parse(String description) {
     def result = []
-    def cmd = zwave.parse(description, [0x20: 1, 0x31: 2, 0x84: 1])
+    def cmd = zwave.parse(description, [0x20: 1, 0x31: 2, 0x80: 1, 0x84: 1])
+    
+    log.debug "$description"
+    
     if (cmd) {
         if (cmd.CMD == "8407") {
+        
+			if (shouldRequestBattery()) {
+            
+            	log.debug "Requesting Battery Update"
+                result << response(zwave.batteryV1.batteryGet())
+                result << response("delay 1200")
+            }
+
             result << new physicalgraph.device.HubAction(zwave.wakeUpV1.wakeUpNoMoreInformation().format())
         }
         result << createEvent(zwaveEvent(cmd))
@@ -112,6 +154,22 @@ def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv2.SensorMultilevelR
             map.unit = "F"
         }
         map.descriptionText = "${device.displayName} temperature is ${map.value} ${map.unit}"
+    }
+    return map
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
+    markLastBatteryRequested()
+    
+    def map = [:]
+    map.name = "battery"
+    map.unit = "%"
+    if (cmd.batteryLevel == 0xFF) {
+        map.value = 1
+        map.descriptionText = "${device.displayName} has a low battery"
+        map.isStateChange = true
+    } else {
+        map.value = cmd.batteryLevel
     }
     return map
 }
