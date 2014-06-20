@@ -8,6 +8,13 @@
  */
 
 metadata {
+	// Automatically generated. Make future change here.
+	definition (name: "Monoprice Window Sensor", author: "Adam Heinmiller") 
+    {
+        capability "Contact Sensor"
+		capability "Battery"
+	}
+
     simulator {
         status "open":  "command: 2001, payload: FF"
         status "closed": "command: 2001, payload: 00"
@@ -36,7 +43,7 @@ def shouldRequestBattery() {
     if (!state.lastBatteryRequested) {
         return true
     }
-    return (getTimestamp() - state.lastBatteryRequested) > 53*60*60*1000
+    return (getTimestamp() - state.lastBatteryRequested) > 24*60*60*1000
 }
 
 def markLastBatteryRequested() {
@@ -51,6 +58,7 @@ def parse(String description) {
         if (cmd.CMD == "8407") {
             // Request the battery level?
             if (shouldRequestBattery()) {
+            	log.debug "Requesting Battery Update"
                 result << response(zwave.batteryV1.batteryGet())
                 result << response("delay 1200")
             }
