@@ -6,12 +6,12 @@
  *	Author: Adam Heinmiller
  *  Original Author: FlorianZ
  
- *  Date: 2014-02-24
+ *  Date: 2014-07-1
  */
 
 metadata 
 {
-	definition (name: "Monoprice Window Sensor", author: "Adam Heinmiller") 
+	definition (name: "Monoprice Door/Window Sensor", author: "Adam Heinmiller") 
     {
         capability "Contact Sensor"
 		capability "Battery"
@@ -56,18 +56,23 @@ def updated()
 	state.lastBatteryRequested = null
 }
 
-def getTimestamp() {
-    new Date().time
+def getTimestamp() 
+{
+    return new Date().time
 }
 
-def shouldRequestBattery() {
-    if (!state.lastBatteryRequested) {
+def shouldRequestBattery() 
+{
+    if (!state.lastBatteryRequested) 
+    {
         return true
     }
+    
     return (getTimestamp() - state.lastBatteryRequested) > 24*60*60*1000
 }
 
-def markLastBatteryRequested() {
+def markLastBatteryRequested() 
+{
     state.lastBatteryRequested = getTimestamp()
 }
 
@@ -97,47 +102,41 @@ def parse(String description)
         }
         
         result << createEvent(zwaveEvent(cmd))
-    }
-
-    log.debug "Parse returned ${result}"
+	}
     
     return result
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) 
 {
-    def map = [:]
-    map.name = "contact"
-    map.value = cmd.value ? "open" : "closed"
-    map.descriptionText = cmd.value ? "${device.displayName} is open" : "${device.displayName} is closed"
-    return map
+    logCommand(cmd)
+
+	return [name: "contact", value: cmd.value ? "open" : "closed", descriptionText: cmd.value ? "${device.displayName} is open" : "${device.displayName} is closed"]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.wakeupv1.WakeUpNotification cmd) 
 {
-    def map = [:]
-    map.value = "";
-    map.descriptionText = "${device.displayName} woke up"
-    return map
+    logCommand(cmd)
+
+	return [value: "", descriptionText: "${device.displayName} woke up"]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) 
 {
-    markLastBatteryRequested()
+    logCommand(cmd)
+
+	markLastBatteryRequested()
     
-    def map = [:]
-    map.name = "battery"
-    map.unit = "%"
+    
+    def map = [name: "battery", unit: "%"]
     
     if (cmd.batteryLevel == 0xFF) 
     {
-        map.value = 1
-        map.descriptionText = "${device.displayName} has a low battery"
-        map.isStateChange = true
+    	map += [value: 1, descriptionText: "${device.displayName} has a low battery", isStateChange: true]    	
     } 
     else 
     {
-        map.value = cmd.batteryLevel
+    	map += [value: cmd.batteryLevel]
     }
     
     return map
@@ -146,10 +145,13 @@ def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd)
 
 def zwaveEvent(physicalgraph.zwave.commands.notificationv3.NotificationReport cmd) 
 {
-	def map = null
+    logCommand(cmd)
+
+	
+    def map = null
     
     if (cmd.event == 3) map = [name: "tamper", value: 1, descriptionText: "${device.displayName} case has opened"]
-
+        
     return map
 }
 
@@ -160,10 +162,15 @@ def resetTamperIndicator()
 }
 
 
-
 def zwaveEvent(physicalgraph.zwave.Command cmd) 
 {
-    // Catch-all handler. The sensor does return some alarm values, which
-    // could be useful if handled correctly (tamper alarm, etc.)
-    [descriptionText: "Unhandled: ${device.displayName}: ${cmd}", displayed: false]
+    logCommand(cmd)
+
+	return [descriptionText: "Unhandled: ${device.displayName}: ${cmd}", displayed: false]
+}
+
+
+def logCommand(cmd)
+{
+	log.debug "Device Command:  $cmd"
 }
