@@ -5,13 +5,13 @@
  *
  *	Author: Adam Heinmiller
  *  Original Author: FlorianZ
- 
+ *
  *  Date: 2014-07-1
  */
 
 metadata 
 {
-	definition (name: "Monoprice Door/Window Sensor", author: "Adam Heinmiller") 
+	definition (namespace: "com.github.adamheinmiller.", name: "Monoprice Door/Window Sensor", author: "Adam Heinmiller") 
     {
         capability "Contact Sensor"
 		capability "Battery"
@@ -23,8 +23,16 @@ metadata
 
     simulator 
     {
-        status "open":  "command: 2001, payload: FF"
-        status "closed": "command: 2001, payload: 00"
+        status "Contact Open":  "command: 7105, payload: 07 FF 00 FF 07 02 00 00"
+        status "Contact Closed": "command: 7105, payload: 07 00 00 FF 07 02 00 00"
+        
+        status "External Sensor Open":  "command: 7105, payload: 07 FF 00 FF 07 FE 00 00"
+        status "External Sensor Closed": "command: 7105, payload: 07 00 00 FF 07 FE 00 00"
+ 
+        status "Case Opened":  "command: 7105, payload: 07 FF 00 FF 07 03 00 00"
+        status "Case Closed": "command: 8407, payload: 00"
+
+		status "Battery Status": "command: 8003, payload: 1F"
     }
 
     tiles 
@@ -51,9 +59,16 @@ metadata
     }
 }
 
+def installed()
+{
+	updated()
+}
+
 def updated()
 {
 	state.lastBatteryRequested = null
+    
+    state.PinState = "closed"
 }
 
 def getTimestamp() 
@@ -80,7 +95,10 @@ def parse(String description)
 {
     def result = []
     
-    def cmd = zwave.parse(description, [0x20: 1, 0x80: 1, 0x84: 1, 0x71: 3])
+    def cmd = zwave.parse(description, [0x80: 1, 0x84: 1, 0x71: 3])
+    
+    
+    // log.debug "Command: $description"
     
     if (cmd) 
     {
@@ -105,13 +123,6 @@ def parse(String description)
 	}
     
     return result
-}
-
-def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) 
-{
-    logCommand(cmd)
-
-	return [name: "contact", value: cmd.value ? "open" : "closed", descriptionText: cmd.value ? "${device.displayName} is open" : "${device.displayName} is closed"]
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.wakeupv1.WakeUpNotification cmd) 
@@ -151,7 +162,25 @@ def zwaveEvent(physicalgraph.zwave.commands.notificationv3.NotificationReport cm
     def map = null
     
     if (cmd.event == 3) map = [name: "tamper", value: 1, descriptionText: "${device.displayName} case has opened"]
+    else if (cmd.event == 2)
+    {
+    	state.ContactState = cmd.v1AlarmLevel ? "open" : "closed"
         
+    	map = [name: "contact", value: state.ContactState, descriptionText: cmd.v1AlarmLevel ? "${device.displayName} is open" : "${device.displayName} is closed"]
+	
+    	if (state.ContactState == "closed" && state.PinState == "open") map = null;
+    }
+    else if (cmd.event == 254) 
+    {
+    	state.PinState = cmd.v1AlarmLevel ? "open" : "closed"
+
+		map = [name: "contact", value: state.PinState, descriptionText: cmd.v1AlarmLevel ? "${device.displayName} external sensor is open" : "${device.displayName} external sensor is closed"]
+
+    	if (state.PinState == "closed" && state.ContactState == "open") map = null;
+	}
+    
+    log.debug "Contact: ${state.ContactState}, External: ${state.PinState}"
+
     return map
 }
 
