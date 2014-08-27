@@ -1,17 +1,15 @@
 /**
  *  Monoprice Door/Window Sensor
  *
- *  Capabilities: Contact, Battery
- *
  *	Author: Adam Heinmiller
- *  Original Author: FlorianZ
+ *  Original Author: FlorianZ (https://github.com/FlorianZ/SmartDevices)
  *
- *  Date: 2014-07-1
+ *  Date: 2014-08-27
  */
 
 metadata 
 {
-	definition (namespace: "com.github.adamheinmiller.", name: "Monoprice Door/Window Sensor", author: "Adam Heinmiller") 
+	definition (namespace: "com.github.adamheinmiller.st_monopricedevices", name: "Monoprice Door/Window Sensor", author: "Adam Heinmiller") 
     {
         capability "Contact Sensor"
 		capability "Battery"
